@@ -1,5 +1,6 @@
+from functools import cached_property
 from itertools import zip_longest
-from typing import Optional, List, Union, Iterator, Any, Dict, cast
+from typing import Optional, Union, Iterator, Any, cast
 
 from aiogram import Bot
 from aiogram.types import (
@@ -16,10 +17,10 @@ from aiogram.types.base import UNSET
 
 
 def to_input_media(
-    message: Message,
-    caption: Optional[str] = None,
-    parse_mode: Optional[str] = UNSET_PARSE_MODE,
-    caption_entities: Optional[List[MessageEntity]] = None,
+        message: Message,
+        caption: Optional[str] = None,
+        parse_mode: Optional[str] = UNSET_PARSE_MODE,
+        caption_entities: Optional[list[MessageEntity]] = None,
 ) -> InputMedia:
     if message.content_type == "photo":
         cls = InputMediaPhoto
@@ -44,18 +45,26 @@ def to_input_media(
 
 
 class BaseAlbumMessage(Message, frozen=False):
-    _messages: List[Message]
+    _messages: list[Message]
+    _captions: list[Message]
 
     @classmethod
-    def new(cls, messages: List[Message], data: dict[str, Any]) -> "BaseAlbumMessage":
+    def _get_primary_caption(cls, captions: tuple[str | None, ...]) -> str | None:
+        valid_captions = tuple(caption for caption in captions if caption)
+        return valid_captions[0] if len(valid_captions) == 1 else None
+
+    @classmethod
+    def new(cls, messages: list[Message], data: dict[str, Any]) -> "BaseAlbumMessage":
         bot = cast(Bot, data["bot"])
         self = cls.model_validate(messages[0], from_attributes=True).as_(bot)
         self._messages = messages
+        self._captions = tuple(m.caption for m in messages)
+        self.caption = cls._get_primary_caption(self._captions)
         setattr(self, messages[0].content_type, None)
         return self
 
     @property
-    def messages(self) -> List[Message]:
+    def messages(self) -> list[Message]:
         return self._messages
 
     @property
@@ -63,13 +72,13 @@ class BaseAlbumMessage(Message, frozen=False):
         return "media_group"
 
     def as_input_media(
-        self,
-        caption: Optional[Union[str, List[str]]] = UNSET,
-        parse_mode: Optional[str] = UNSET_PARSE_MODE,
-        caption_entities: Optional[
-            Union[List[MessageEntity], List[List[MessageEntity]]]
-        ] = UNSET,
-    ) -> List[InputMedia]:
+            self,
+            caption: Optional[Union[str, list[str]]] = UNSET,
+            parse_mode: Optional[str] = UNSET_PARSE_MODE,
+            caption_entities: Optional[
+                Union[list[MessageEntity], list[list[MessageEntity]]]
+            ] = UNSET,
+    ) -> list[InputMedia]:
         if caption is UNSET:
             caption = [None]
         elif isinstance(caption, str):
@@ -87,8 +96,12 @@ class BaseAlbumMessage(Message, frozen=False):
         ]
 
     @property
-    def message_ids(self) -> List[int]:
+    def message_ids(self) -> list[int]:
         return [message.message_id for message in self._messages]
+
+    @cached_property
+    def captions(self) -> tuple[str | None, ...]:
+        return self._captions
 
     def __iter__(self) -> Iterator[Message]:
         return self._messages.__iter__()
@@ -97,24 +110,24 @@ class BaseAlbumMessage(Message, frozen=False):
         return self._messages.__len__()
 
     async def copy_to(
-        self,
-        chat_id: Union[int, str],
-        *args,
-        **kwargs: Any,
+            self,
+            chat_id: Union[int, str],
+            *args,
+            **kwargs: Any,
     ) -> Any:
         raise NotImplementedError
 
     async def forward(
-        self,
-        chat_id: Union[int, str],
-        *args,
-        **kwargs: Any,
+            self,
+            chat_id: Union[int, str],
+            *args,
+            **kwargs: Any,
     ) -> Any:
         raise NotImplementedError
 
     async def delete(
-        self,
-        *args,
-        **kwargs: Any,
+            self,
+            *args,
+            **kwargs: Any,
     ) -> Any:
         raise NotImplementedError
