@@ -46,7 +46,7 @@ def to_input_media(
 
 class BaseAlbumMessage(Message, frozen=False):
     _messages: list[Message]
-    _captions: list[Message]
+    _captions: tuple[str, ...]
 
     @classmethod
     def _get_primary_caption(cls, captions: tuple[str | None, ...]) -> str | None:
@@ -95,7 +95,7 @@ class BaseAlbumMessage(Message, frozen=False):
             )
         ]
 
-    @property
+    @cached_property
     def message_ids(self) -> list[int]:
         return [message.message_id for message in self._messages]
 
